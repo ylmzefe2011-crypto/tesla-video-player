@@ -129,7 +129,7 @@ export default function VideoLibrary() {
 
       {/* Main Content */}
       <main className="container py-8">
-        {isLoading && !isError ? (
+        {isLoading && !isError && displayedVideos.length === 0 ? (
           <div className="flex items-center justify-center py-20">
             <div className="text-center">
               <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
@@ -223,28 +223,3 @@ export default function VideoLibrary() {
         open={deleteVideoId !== null}
         onOpenChange={(open) => !open && setDeleteVideoId(null)}
       >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Video</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this video? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (deleteVideoId) {
-                  deleteMutation.mutate({ videoId: deleteVideoId });
-                }
-              }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  );
-}
