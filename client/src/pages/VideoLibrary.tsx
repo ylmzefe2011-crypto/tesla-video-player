@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 
-type DemoVideo = {
+type LibraryVideo = {
   id: number;
   title: string;
   thumbnailUrl: string | null;
@@ -25,7 +25,9 @@ type DemoVideo = {
   fileUrl: string;
 };
 
-const DEMO_VIDEOS: DemoVideo[] = [
+const USE_DEMO_VIDEOS = import.meta.env.VITE_USE_DEMO_VIDEOS === "true";
+
+const DEMO_VIDEOS: LibraryVideo[] = [
   {
     id: 1,
     title: "Flower Demo MP4",
@@ -34,30 +36,24 @@ const DEMO_VIDEOS: DemoVideo[] = [
     fileSize: 1200000,
     fileUrl: "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
   },
-  {
-    id: 2,
-    title: "Rabbit Demo MP4",
-    thumbnailUrl: null,
-    duration: 15,
-    fileSize: 1500000,
-    fileUrl: "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
-  },
 ];
 
 export default function VideoLibrary() {
   const [selectedVideo, setSelectedVideo] = useState<number | null>(null);
   const [deleteVideoId, setDeleteVideoId] = useState<number | null>(null);
 
-  // Fetch videos
   const { data: videos, isLoading, isError, refetch } = trpc.videos.list.useQuery(
     undefined,
     { retry: false }
   );
 
-  const displayedVideos: DemoVideo[] =
-    videos && videos.length > 0 ? (videos as DemoVideo[]) : isError || !videos ? DEMO_VIDEOS : [];
+  const displayedVideos: LibraryVideo[] =
+    videos && videos.length > 0
+      ? (videos as LibraryVideo[])
+      : USE_DEMO_VIDEOS && (isError || !videos)
+      ? DEMO_VIDEOS
+      : [];
 
-  // Get selected video details
   const { data: videoDetails } = trpc.videos.get.useQuery(
     { videoId: selectedVideo! },
     { enabled: !!selectedVideo && !!videos && videos.length > 0, retry: false }
@@ -66,7 +62,6 @@ export default function VideoLibrary() {
   const selectedDemoVideo =
     videoDetails || displayedVideos.find((v) => v.id === selectedVideo) || null;
 
-  // Delete mutation
   const deleteMutation = trpc.videos.delete.useMutation({
     onSuccess: () => {
       toast.success("Video deleted successfully");
@@ -91,7 +86,6 @@ export default function VideoLibrary() {
     return `${mb.toFixed(1)} MB`;
   };
 
-  // Show video player if video is selected
   if (selectedVideo && selectedDemoVideo) {
     return (
       <NativeVideoPlayer
@@ -104,7 +98,6 @@ export default function VideoLibrary() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="border-b border-border bg-card">
         <div className="container py-6">
           <div className="flex items-center justify-between">
@@ -127,9 +120,8 @@ export default function VideoLibrary() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="container py-8">
-        {isLoading && !isError && displayedVideos.length === 0 ? (
+        {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <div className="text-center">
               <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
@@ -144,7 +136,6 @@ export default function VideoLibrary() {
                 className="video-card group overflow-hidden"
                 onClick={() => setSelectedVideo(video.id)}
               >
-                {/* Thumbnail */}
                 <div className="relative aspect-video bg-muted overflow-hidden">
                   {video.thumbnailUrl ? (
                     <img
@@ -158,14 +149,12 @@ export default function VideoLibrary() {
                     </div>
                   )}
 
-                  {/* Play Overlay */}
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center">
                       <Play className="w-8 h-8 text-primary-foreground ml-1" />
                     </div>
                   </div>
 
-                  {/* Duration Badge */}
                   {video.duration && (
                     <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded">
                       {formatDuration(video.duration)}
@@ -173,7 +162,6 @@ export default function VideoLibrary() {
                   )}
                 </div>
 
-                {/* Video Info */}
                 <CardContent className="p-4">
                   <h3 className="font-semibold text-foreground line-clamp-2 mb-2">
                     {video.title}
@@ -200,10 +188,12 @@ export default function VideoLibrary() {
           <div className="text-center py-20">
             <VideoIcon className="w-20 h-20 text-muted-foreground mx-auto mb-6" />
             <h2 className="text-2xl font-semibold text-foreground mb-3">
-              No videos yet
+              {isError ? "Unable to reach video server" : "No videos yet"}
             </h2>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              Send YouTube video links to the Telegram bot to start building your library.
+              {isError
+                ? "Check your backend API connection and environment variables, then refresh."
+                : "Send YouTube video links to the Telegram bot to start building your library."}
             </p>
             <div className="bg-muted/50 rounded-lg p-6 max-w-md mx-auto text-left">
               <h3 className="font-semibold mb-3">How to add videos:</h3>
@@ -218,7 +208,6 @@ export default function VideoLibrary() {
         )}
       </main>
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog
         open={deleteVideoId !== null}
         onOpenChange={(open) => !open && setDeleteVideoId(null)}
