@@ -16,18 +16,55 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 
+type DemoVideo = {
+  id: number;
+  title: string;
+  thumbnailUrl: string | null;
+  duration: number | null;
+  fileSize: number | null;
+  fileUrl: string;
+};
+
+const DEMO_VIDEOS: DemoVideo[] = [
+  {
+    id: 1,
+    title: "Big Buck Bunny (Demo MP4)",
+    thumbnailUrl: null,
+    duration: 60,
+    fileSize: 5510872,
+    fileUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+  },
+  {
+    id: 2,
+    title: "Elephants Dream (Demo MP4)",
+    thumbnailUrl: null,
+    duration: 653,
+    fileSize: 15800000,
+    fileUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
+  },
+];
+
 export default function VideoLibrary() {
   const [selectedVideo, setSelectedVideo] = useState<number | null>(null);
   const [deleteVideoId, setDeleteVideoId] = useState<number | null>(null);
 
   // Fetch videos
-  const { data: videos, isLoading, refetch } = trpc.videos.list.useQuery();
+  const { data: videos, isLoading, isError, refetch } = trpc.videos.list.useQuery(
+    undefined,
+    { retry: false }
+  );
+
+  const displayedVideos: DemoVideo[] =
+    videos && videos.length > 0 ? (videos as DemoVideo[]) : isError || !videos ? DEMO_VIDEOS : [];
 
   // Get selected video details
   const { data: videoDetails } = trpc.videos.get.useQuery(
     { videoId: selectedVideo! },
-    { enabled: !!selectedVideo }
+    { enabled: !!selectedVideo && !!videos && videos.length > 0, retry: false }
   );
+
+  const selectedDemoVideo =
+    videoDetails || displayedVideos.find((v) => v.id === selectedVideo) || null;
 
   // Delete mutation
   const deleteMutation = trpc.videos.delete.useMutation({
@@ -55,11 +92,11 @@ export default function VideoLibrary() {
   };
 
   // Show video player if video is selected
-  if (selectedVideo && videoDetails) {
+  if (selectedVideo && selectedDemoVideo) {
     return (
       <NativeVideoPlayer
-        videoUrl={videoDetails.fileUrl}
-        title={videoDetails.title}
+        videoUrl={selectedDemoVideo.fileUrl}
+        title={selectedDemoVideo.title}
         onClose={() => setSelectedVideo(null)}
       />
     );
@@ -82,7 +119,7 @@ export default function VideoLibrary() {
             <div className="flex items-center gap-4">
               <div className="text-right">
                 <p className="text-sm text-muted-foreground">
-                  {videos?.length || 0} videos
+                  {displayedVideos.length} videos
                 </p>
               </div>
             </div>
@@ -92,16 +129,16 @@ export default function VideoLibrary() {
 
       {/* Main Content */}
       <main className="container py-8">
-        {isLoading ? (
+        {isLoading && !isError ? (
           <div className="flex items-center justify-center py-20">
             <div className="text-center">
               <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
               <p className="text-muted-foreground">Loading your videos...</p>
             </div>
           </div>
-        ) : videos && videos.length > 0 ? (
+        ) : displayedVideos.length > 0 ? (
           <div className="video-grid">
-            {videos.map((video) => (
+            {displayedVideos.map((video) => (
               <Card
                 key={video.id}
                 className="video-card group overflow-hidden"
