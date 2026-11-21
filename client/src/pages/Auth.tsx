@@ -15,29 +15,36 @@ export default function Auth() {
   const hasGeneratedToken = useRef(false);
   const utils = trpc.useUtils();
 
+  const createQrFromToken = async (token: string) => {
+    setAuthToken(token);
+    const botUsername = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || "theteslacarbot";
+    const telegramUrl = `https://t.me/${botUsername}?start=${token}`;
+    const qrUrl = await QRCode.toDataURL(telegramUrl, {
+      width: 300,
+      margin: 2,
+      color: {
+        dark: "#000000",
+        light: "#FFFFFF",
+      },
+    });
+    setQrCodeUrl(qrUrl);
+    setIsPolling(true);
+  };
+
   // Generate auth token
   const generateTokenMutation = trpc.auth.generateAuthToken.useMutation({
     onSuccess: async (data) => {
-      setAuthToken(data.authToken);
-      
-      // Generate QR code with Telegram deep link
-      const botUsername = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'theteslacarbot';
-      const telegramUrl = `https://t.me/${botUsername}?start=${data.authToken}`;
-      const qrUrl = await QRCode.toDataURL(telegramUrl, {
-        width: 300,
-        margin: 2,
-        color: {
-          dark: "#000000",
-          light: "#FFFFFF",
-        },
-      });
-      setQrCodeUrl(qrUrl);
-      setIsPolling(true);
+      await createQrFromToken(data.authToken);
+    },
+    onError: async () => {
+      // Backend olmadığı için yerel geçici token ile QR kod üret
+      const localToken = `local_${Date.now()}`;
+      await createQrFromToken(localToken);
     },
   });
 
   // Poll for auth status
-  const { data: authStatus, refetch } = trpc.auth.checkAuthStatus.useQuery(
+  const { data: authStatus } = trpc.auth.checkAuthStatus.useQuery(
     { authToken: authToken || "" },
     {
       enabled: isPolling && !!authToken,
@@ -49,18 +56,12 @@ export default function Auth() {
   // Login mutation to set session cookie
   const loginMutation = trpc.auth.loginWithTelegram.useMutation({
     onSuccess: async () => {
-      // Session cookie set, now invalidate the auth cache and wait for it to confirm
-      // This prevents the race condition where we redirect before the session is recognized
       try {
-        // Invalidate the auth.me cache so it refetches with the new cookie
         await utils.auth.me.invalidate();
-        // Refetch to confirm the session is valid
         const result = await utils.auth.me.fetch();
         if (result) {
-          // Session confirmed, safe to redirect
           setLocation("/");
         } else {
-          // Session not confirmed, try again
           console.error("Session not confirmed after login");
           setIsLoggingIn(false);
           setIsPolling(true);
@@ -81,8 +82,6 @@ export default function Auth() {
   // Check if authenticated
   useEffect(() => {
     if (authStatus?.verified && authStatus.userId && authToken && !isLoggingIn) {
-      // Stop polling and call login to set session cookie
-      // Set isLoggingIn to prevent multiple login attempts
       setIsPolling(false);
       setIsLoggingIn(true);
       loginMutation.mutate({ authToken });
@@ -108,7 +107,7 @@ export default function Auth() {
     );
   }
 
-  if (generateTokenMutation.isError) {
+  if (generateTokenMutation.isError && !qrCodeUrl) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="max-w-md w-full">
@@ -122,8 +121,8 @@ export default function Auth() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button 
-              onClick={() => generateTokenMutation.mutate()} 
+            <Button
+              onClick={() => generateTokenMutation.mutate()}
               className="w-full"
             >
               Try Again
@@ -148,9 +147,9 @@ export default function Auth() {
           {qrCodeUrl && (
             <div className="flex justify-center">
               <div className="qr-container">
-                <img 
-                  src={qrCodeUrl} 
-                  alt="Authentication QR Code" 
+                <img
+                  src={qrCodeUrl}
+                  alt="Authentication QR Code"
                   className="w-full h-full"
                 />
               </div>
@@ -200,7 +199,7 @@ export default function Auth() {
             <Button
               variant="outline"
               onClick={() => {
-                const botUsername = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'theteslacarbot';
+                const botUsername = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || "theteslacarbot";
                 const telegramUrl = `https://t.me/${botUsername}?start=${authToken}`;
                 window.open(telegramUrl, "_blank");
               }}
