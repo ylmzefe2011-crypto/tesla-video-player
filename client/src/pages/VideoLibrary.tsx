@@ -141,4 +141,110 @@ export default function VideoLibrary() {
             {displayedVideos.map((video) => (
               <Card
                 key={video.id}
-                className="video-card group
+                className="video-card group overflow-hidden"
+                onClick={() => setSelectedVideo(video.id)}
+              >
+                {/* Thumbnail */}
+                <div className="relative aspect-video bg-muted overflow-hidden">
+                  {video.thumbnailUrl ? (
+                    <img
+                      src={video.thumbnailUrl}
+                      alt={video.title}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <VideoIcon className="w-16 h-16 text-muted-foreground" />
+                    </div>
+                  )}
+
+                  {/* Play Overlay */}
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center">
+                      <Play className="w-8 h-8 text-primary-foreground ml-1" />
+                    </div>
+                  </div>
+
+                  {/* Duration Badge */}
+                  {video.duration && (
+                    <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded">
+                      {formatDuration(video.duration)}
+                    </div>
+                  )}
+                </div>
+
+                {/* Video Info */}
+                <CardContent className="p-4">
+                  <h3 className="font-semibold text-foreground line-clamp-2 mb-2">
+                    {video.title}
+                  </h3>
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>{formatFileSize(video.fileSize)}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteVideoId(video.id);
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-20">
+            <VideoIcon className="w-20 h-20 text-muted-foreground mx-auto mb-6" />
+            <h2 className="text-2xl font-semibold text-foreground mb-3">
+              No videos yet
+            </h2>
+            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+              Send YouTube video links to the Telegram bot to start building your library.
+            </p>
+            <div className="bg-muted/50 rounded-lg p-6 max-w-md mx-auto text-left">
+              <h3 className="font-semibold mb-3">How to add videos:</h3>
+              <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground">
+                <li>Open the Telegram bot on your phone</li>
+                <li>Send any YouTube video URL</li>
+                <li>Wait for the download to complete</li>
+                <li>Refresh this page to see your videos</li>
+              </ol>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        open={deleteVideoId !== null}
+        onOpenChange={(open) => !open && setDeleteVideoId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Video</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this video? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteVideoId) {
+                  deleteMutation.mutate({ videoId: deleteVideoId });
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
