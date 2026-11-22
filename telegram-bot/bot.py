@@ -66,17 +66,21 @@ def prepare_cookies_file() -> str | None:
 
     if cookies_b64:
         os.makedirs(os.path.dirname(cookies_path), exist_ok=True)
-        decoded = base64.b64decode(cookies_b64).decode("utf-8", errors="ignore")
+        clean_b64 = "".join(cookies_b64.split())
+        decoded = base64.b64decode(clean_b64).decode("utf-8", errors="ignore")
         with open(cookies_path, "w", encoding="utf-8") as f:
             f.write(decoded)
+        logger.info("Cookies written from B64 (%d bytes)", os.path.getsize(cookies_path))
         return cookies_path
 
     if cookies_raw:
         os.makedirs(os.path.dirname(cookies_path), exist_ok=True)
         with open(cookies_path, "w", encoding="utf-8") as f:
             f.write(cookies_raw)
+        logger.info("Cookies written from RAW (%d bytes)", os.path.getsize(cookies_path))
         return cookies_path
 
+    logger.warning("No YouTube cookies environment variable found")
     return None
 
 
@@ -88,7 +92,7 @@ def download_video_info(url: str) -> dict:
         "outtmpl": os.path.join(DOWNLOAD_PATH, "%(id)s.%(ext)s"),
         "extractor_args": {
             "youtube": {
-                "player_client": ["web"],
+                "player_client": ["web", "mweb"],
             }
         },
         "noplaylist": True,
