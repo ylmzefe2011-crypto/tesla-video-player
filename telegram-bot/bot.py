@@ -90,11 +90,6 @@ def download_video_info(url: str) -> dict:
 
     ydl_opts = {
         "outtmpl": os.path.join(DOWNLOAD_PATH, "%(id)s.%(ext)s"),
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["web", "mweb"],
-            }
-        },
         "noplaylist": True,
         "quiet": True,
         "no_warnings": True,
