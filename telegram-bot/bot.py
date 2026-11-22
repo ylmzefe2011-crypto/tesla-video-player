@@ -85,12 +85,11 @@ def download_video_info(url: str) -> dict:
     cookies_file = prepare_cookies_file()
 
     ydl_opts = {
-        "format": "bv*+ba/b/best",
-        "merge_output_format": "mp4",
+        "format": "bestvideo+bestaudio/best",
         "outtmpl": os.path.join(DOWNLOAD_PATH, "%(id)s.%(ext)s"),
         "extractor_args": {
             "youtube": {
-                "player_client": ["android", "web"],
+                "player_client": ["web"],
             }
         },
         "noplaylist": True,
