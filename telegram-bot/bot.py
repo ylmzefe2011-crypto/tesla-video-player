@@ -160,4 +160,95 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
         lines = [f"{idx + 1}. {r['title']}" for idx, r in enumerate(rows)]
         await update.message.reply_text("Son videoların:\n" + "\n".join(lines))
-    except
+    except Exception as exc:
+        logger.error("DB error on /list: %s", exc)
+        await update.message.reply_text("Videolar listelenirken bir hata oluştu.")
+
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.effective_user or not update.message or not update.message.text:
+        return
+
+    text = update.message.text.strip()
+    parsed = urlparse(text)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        await update.message.reply_text("Lütfen geçerli bir http/https video bağlantısı gönder.")
+        return
+
+    status_msg = await update.message.reply_text("Video işleniyor, lütfen bekle...")
+
+    try:
+        conn = get_db_connection()
+        user_id = ensure_user(conn, update.effective_user)
+
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO download_queue (user_id, telegram_chat_id, youtube_url, status)
+                VALUES (%s, %s, %s, 'downloading')
+                RETURNING id
+                """,
+                (user_id, str(update.effective_chat.id), text),
+            )
+            queue_id = cur.fetchone()["id"]
+            conn.commit()
+
+        meta = download_video_info(text)
+
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO videos (user_id, youtube_id, title, thumbnail_url, duration, file_size, file_url)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+                """,
+                (
+                    user_id,
+                    meta["youtube_id"],
+                    meta["title"],
+                    meta["thumbnail_url"],
+                    meta["duration"],
+                    meta["file_size"],
+                    meta["file_url"],
+                ),
+            )
+            cur.execute(
+                "UPDATE download_queue SET status = 'completed', updated_at = NOW() WHERE id = %s",
+                (queue_id,),
+            )
+            conn.commit()
+
+        conn.close()
+        await status_msg.edit_text(f"Tamamlandı: {meta['title']}")
+    except Exception as exc:
+        logger.error("Video processing failed: %s", exc)
+        try:
+            if "conn" in locals() and "queue_id" in locals():
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "UPDATE download_queue SET status = 'failed', error_message = %s, updated_at = NOW() WHERE id = %s",
+                        (str(exc)[:500], queue_id),
+                    )
+                    conn.commit()
+                conn.close()
+        except Exception:
+            pass
+        await status_msg.edit_text("Video işlenirken bir hata oluştu.")
+
+
+def main() -> None:
+    if not BOT_TOKEN:
+        raise RuntimeError("TELEGRAM_BOT_TOKEN environment variable is required")
+
+    app = Application.builder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CommandHandler("list", list_command))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    logger.info("Telegram bot started polling...")
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
+
+
+if __name__ == "__main__":
+    main()
