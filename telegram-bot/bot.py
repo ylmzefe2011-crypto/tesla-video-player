@@ -1,3 +1,4 @@
+import base64
 import logging
 import os
 import re
@@ -58,15 +59,42 @@ def extract_youtube_id(url: str) -> str | None:
     return None
 
 
+def prepare_cookies_file() -> str | None:
+    cookies_b64 = os.getenv("YOUTUBE_COOKIES_B64")
+    cookies_raw = os.getenv("YOUTUBE_COOKIES")
+    cookies_path = "/tmp/cookies.txt"
+
+    if cookies_b64:
+        os.makedirs(os.path.dirname(cookies_path), exist_ok=True)
+        decoded = base64.b64decode(cookies_b64).decode("utf-8", errors="ignore")
+        with open(cookies_path, "w", encoding="utf-8") as f:
+            f.write(decoded)
+        return cookies_path
+
+    if cookies_raw:
+        os.makedirs(os.path.dirname(cookies_path), exist_ok=True)
+        with open(cookies_path, "w", encoding="utf-8") as f:
+            f.write(cookies_raw)
+        return cookies_path
+
+    return None
+
+
 def download_video_info(url: str) -> dict:
     os.makedirs(DOWNLOAD_PATH, exist_ok=True)
+    cookies_file = prepare_cookies_file()
+
     ydl_opts = {
-        "format": "mp4[ext=mp4]/best[ext=mp4]/best",
+        "format": "bestvideo*+bestaudio*/best",
+        "merge_output_format": "mp4",
         "outtmpl": os.path.join(DOWNLOAD_PATH, "%(id)s.%(ext)s"),
         "noplaylist": True,
         "quiet": True,
         "no_warnings": True,
     }
+    if cookies_file:
+        ydl_opts["cookiefile"] = cookies_file
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
         filepath = ydl.prepare_filename(info)
