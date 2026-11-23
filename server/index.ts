@@ -1,9 +1,15 @@
 import "dotenv/config";
+import path from "path";
+import { fileURLToPath } from "url";
 import express from "express";
 import cors from "cors";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { appRouter } from "./routers";
 import { createContext } from "./trpc";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const clientDistPath = path.resolve(__dirname, "../client/dist");
 
 const app = express();
 const port = Number(process.env.PORT) || 3000;
@@ -42,6 +48,15 @@ app.use(
     createContext,
   })
 );
+
+app.use(express.static(clientDistPath));
+
+app.get("*", (req, res, next) => {
+  if (req.path.startsWith("/api/trpc") || req.path === "/health") {
+    return next();
+  }
+  res.sendFile(path.join(clientDistPath, "index.html"));
+});
 
 app.listen(port, "0.0.0.0", () => {
   console.log(`Backend listening on port ${port}`);
